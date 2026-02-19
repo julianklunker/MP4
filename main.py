@@ -1,21 +1,40 @@
 import cv2
-import numpy as np
+#import numpy as np
 from Camera.Camera import Camera
 from Data_analysis.Tracker import Tracker
+from Robot.Combined_bot_test import Sorting_bot
 
 
-camera = Camera(camera_index=0)
-camera.connect()
+items = {"Red"  : "item0",
+         "Green": "item1"}
 
-tracker = Tracker()
+
 
 if __name__ == "__main__":
+    
+    camera = Camera(camera_index=0)
+    camera.connect()
+    tracker = Tracker()
+    com_port = ""
+    robot = Sorting_bot(com_port)
+    
     while True:
+        
         frame = camera.capture_frame()
+        
         object_information = tracker.object_information(frame)
+        
         cv2.imshow("Camera Feed", frame)
+        
         if frame is not None:
             if object_information:
                 print(f"{object_information}")
         if cv2.waitKey(1) & 0xFF == ord('q'):
           break
+      
+        robot.pickup(object_information[0])
+        robot.dropoff(items[object_information[1]])
+      
+      
+      
+      

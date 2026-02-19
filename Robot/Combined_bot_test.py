@@ -1,6 +1,6 @@
 import serial
 import time
-import sys
+#import sys
 #import threading
 #import re
 
@@ -162,11 +162,80 @@ class Maxi(Robot):
         super().__init__(*args, **kwargs)
 
         self.z_offset = -825
+
+
+class Sorting_bot(Maxi):
+    def __init__(self, port, *args, **kwargs):
+        try :
+            super().__init__(port, *args, **kwargs)
+        except:
+            print("Error")
         
+        if not self:
+            print("Not working")
+        
+        self.Z_PICKUP = 0
+        self.Z_BEFORE_PUMP = 30
+        self.Z_FOR_MOVE = 150
+        self.drop_locs = {"item0": (150,0),
+                          "item1": (150,150),
+                          "item2": (150,-150),
+                          "item3": (-150,0),
+                          "item4": (-150,150),
+                          "item5": (-150,-150)}
+        
+    def pickup(self,pos):
+        self.move(x=pos)
+        self.move(z=self.Z_BEFORE_PUMP)
+        self.pump_on()
+        self.move(z=self.Z_PICKUP)
+        self.move(z=self.Z_FOR_MOVE)
+    
+    def dropoff(self,item):
+        X_DROP, Y_DROP = self.drop_locs[item]
+        self.move(x=X_DROP, y=Y_DROP)
+        self.move(z=self.Z_FOR_DROPOFF)
+        self.pump_off()
+        
+        
+class Sorting_bot_mini(MiniMHbot):
+    def __init__(self, port, *args, **kwargs):
+        try :
+            super().__init__(port, *args, **kwargs)
+        except:
+            print("Error")
+        
+        if not self:
+            print("Not working")
+        
+        self.Z_PICKUP = 0
+        self.Z_BEFORE_PUMP = 30
+        self.Z_FOR_MOVE = 150
+        self.drop_locs = {"item0": (150,0),
+                          "item1": (150,150),
+                          "item2": (150,-150),
+                          "item3": (-150,0),
+                          "item4": (-150,150),
+                          "item5": (-150,-150)}
+        
+    def pickup(self,pos):
+        self.move(x=pos)
+        self.move(z=self.Z_BEFORE_PUMP)
+        self.pump_on()
+        self.move(z=self.Z_PICKUP)
+        self.move(z=self.Z_FOR_MOVE)
+    
+    def dropoff(self,item):
+        X_DROP, Y_DROP = self.drop_locs[item]
+        self.move(x=X_DROP, y=Y_DROP)
+        self.move(z=self.Z_FOR_DROPOFF)
+        self.pump_off()
+        
+"""
 def initBot(args):
     print("type: ", args[1])
     print("COM port: ", args[2])
-"""
+
 if __name__ == "__main__":
     initBot(sys.argv)
 """
