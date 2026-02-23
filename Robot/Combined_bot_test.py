@@ -200,7 +200,7 @@ class Sorting_bot(Maxi):
         print(self.item)
         self.time_next = time.time()+self.picktime
         self.working = True
-        selv.move(z=self.Z_FOR_MOVE)
+        self.move(z=self.Z_FOR_MOVE)
         self.move(x=pos)
         self.move(z=self.Z_BEFORE_PUMP)
         self.pump_on()
