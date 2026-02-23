@@ -31,6 +31,8 @@ if __name__ == "__main__":
     print("start bot")
     bot.get_response()
     print("connected")
+    print("Going to zero")
+    bot.move(x=0,y=0,z=bot.Z_FOR_MOVE)
     #time.sleep(5)
     
     cam = Camera()
