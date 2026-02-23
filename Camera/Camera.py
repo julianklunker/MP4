@@ -22,6 +22,23 @@ class Camera:
             return None
         return frame
 
+    def remove_background(self, frame):
+        self.background = None
+        if self.background is None:
+            self.background = frame
+        frame = cv2.absdiff(self.background, frame)
+        return frame
+
     def show_feed(self):
         frame = self.capture_frame()
         cv2.imshow("Camera Feed", frame)
+
+if __name__ == "__main__":
+    camera = Camera(camera_index=1)
+    camera.connect()
+    while True:
+        frame = camera.capture_frame()
+        if frame is not None:
+            cv2.imshow("Camera Feed", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
