@@ -126,14 +126,17 @@ class Robot(serial.Serial):
         """
         self.write(f"G04 P{t}")
         
-    def getPos(self):
+    def get_pos(self):
         super().reset_input_buffer()
         self.write("G93")
         response = super().read(16)
         print(type(response))
         #pos = response[2:-1].split(",")
         #print(pos)
-        
+    
+    def read_serial(self):
+        msg = self.read(16)
+        return msg
         
     def closeCon(self):
         super().close()
@@ -177,14 +180,27 @@ class Sorting_bot(Maxi):
         self.Z_PICKUP = 0
         self.Z_BEFORE_PUMP = 30
         self.Z_FOR_MOVE = 150
-        self.drop_locs = {"item0": (150,0),
+        self.Z_FOR_DROPOFF = 30
+        self.drop_locs = {"red": (150,0),
                           "item1": (150,150),
                           "item2": (150,-150),
                           "item3": (-150,0),
                           "item4": (-150,150),
                           "item5": (-150,-150)}
         
+        self.queue = []
+        self.item = False
+        self.time_next = 0
+        self.picktime = 2
+        self.droptime = 2
+        self.working = False
+      
+
     def pickup(self,pos):
+        print(self.item)
+        self.time_next = time.time()+self.picktime
+        self.working = True
+        selv.move(z=self.Z_FOR_MOVE)
         self.move(x=pos)
         self.move(z=self.Z_BEFORE_PUMP)
         self.pump_on()
@@ -192,45 +208,152 @@ class Sorting_bot(Maxi):
         self.move(z=self.Z_FOR_MOVE)
     
     def dropoff(self,item):
+        print(self.item)
+        self.time_next = time.time()+self.droptime
+        self.working = False
         X_DROP, Y_DROP = self.drop_locs[item]
         self.move(x=X_DROP, y=Y_DROP)
         self.move(z=self.Z_FOR_DROPOFF)
-        self.pump_off()
-        
+        self.move(x=0,y=0,z=self.Z_FOR_MOVE)
+     
+    def read_queue(self):
+        try:
+            self.item = self.queue.pop(0)
+        except: 
+            self.item = False
+
+    def status(self):
+        if time.time() >= self.time_next:
+            if self.working:
+                print("Dropping")
+                self.dropoff(self.item[0])
+                self.item = False
+            else:
+                self.read_queue()
+                if self.item:
+                    print("Picking")
+                    self.pickup(self.item[1])
+            return True
+        else:
+            return False
+
+    def get_response(self):
+        msg = self.read(8)
+        self.reset_input_buffer()
+        print(msg)
+        if msg:
+            return True
+        else:
+            return False
+ 
         
 class Sorting_bot_mini(MiniMHbot):
     def __init__(self, port, *args, **kwargs):
-        try :
-            super().__init__(port, *args, **kwargs)
-        except:
-            print("Error")
+        #try :
+        super().__init__(port, *args, **kwargs)
+        #except:
+        #    print("Error")
         
         if not self:
             print("Not working")
         
-        self.Z_PICKUP = 0
-        self.Z_BEFORE_PUMP = 30
+        self.Z_PICKUP = 50
+        self.Z_BEFORE_PUMP = 70
         self.Z_FOR_MOVE = 150
-        self.drop_locs = {"item0": (150,0),
-                          "item1": (150,150),
-                          "item2": (150,-150),
-                          "item3": (-150,0),
-                          "item4": (-150,150),
-                          "item5": (-150,-150)}
+        self.Z_FOR_DROPOFF = 40
+        self.drop_locs = {"item0": (-100,0),
+                          "item1": (10,10),
+                          "item2": (10,-10),
+                          "item3": (-10,0),
+                          "item4": (-10,10),
+                          "item5": (-10,-10)}
+
+        self.queue = []
+        self.item = 0
+        self.time_next = 0
+        self.picktime = 50
+        self.droptime = 50
+        self.working = False
         
     def pickup(self,pos):
+        self.time_next = time.time()+self.picktime
         self.move(x=pos)
         self.move(z=self.Z_BEFORE_PUMP)
-        self.pump_on()
+        #self.pump_on()
         self.move(z=self.Z_PICKUP)
         self.move(z=self.Z_FOR_MOVE)
     
     def dropoff(self,item):
+        self.time_next = time.time()+self.droptime
         X_DROP, Y_DROP = self.drop_locs[item]
         self.move(x=X_DROP, y=Y_DROP)
         self.move(z=self.Z_FOR_DROPOFF)
-        self.pump_off()
+        #self.pump_off()
+        self.move(z=self.Z_FOR_MOVE)
+    
+    def read_queue(self):
+        try:
+            self.item = self.queue.pop(0)
+        except: 
+            self.item = False
+
+    def status(self):
+        if time.time() >= self.time_next:
+            if working:
+                self.dropoff(self.item[0])
+            else:
+                self.read_queue()
+                if self.item:
+                    self.pickup(self.item[1])
+            return True
+        else:
+            return False
+    
+    def get_response(self):
+        msg = self.read(8)
+        self.reset_input_buffer()
+        print(msg)
+        if msg:
+            return True
+        else:
+            return False
+    
+    """
+    def pickup(self,pos):
+        self.move(x=pos)
+        self.get_response()
+        self.move(z=self.Z_BEFORE_PUMP)
+        self.get_response()
+        #self.pump_on()
+        #self.get_response()
+        self.move(z=self.Z_PICKUP)
+        self.get_response()
+        self.move(z=self.Z_FOR_MOVE)
+        self.get_response()
+    
+    def dropoff(self,item):
+        X_DROP, Y_DROP = self.drop_locs[item]
+        self.move(x=X_DROP, y=Y_DROP)
+        self.get_response()
+        self.move(z=self.Z_FOR_DROPOFF)
+        #self.get_response()
+        #self.pump_off()
+        self.get_response()
+        self.move(z=self.Z_FOR_MOVE)
+        self.get_response()
         
+    def get_response(self):
+        while True:
+            print("Reading")
+            msg = self.read(8)
+            self.reset_input_buffer()
+            print(msg)
+            if msg:
+                break
+        return True
+    """
+    
+    
 """
 def initBot(args):
     print("type: ", args[1])
