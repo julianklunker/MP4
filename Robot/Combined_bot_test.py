@@ -1,5 +1,6 @@
 import serial
-import time
+import serial.tools.list_ports
+from time import time, sleep
 #import sys
 #import threading
 #import re
@@ -40,8 +41,16 @@ class Robot(serial.Serial):
             z_offset (int): The z-axis offset value.
 
         """
-        super().__init__(port, baudrate=115200, timeout=10, *args, **kwargs)
+        if kwargs:
+            port_n = kwargs["n_bot"] if kwargs["n_bot"] else 0
+        if port == False:
+            ports = serial.tools.list_ports.comports()
+            if len(ports) >= 1:
+                port = ports[port_n].device
+        print(f"Connecting to {port}")
+        super().__init__(port, baudrate=115200, timeout=10, *args)
         self.z_offset = 0
+        
 
     def write(self, gcode: str):
         """
@@ -130,7 +139,8 @@ class Robot(serial.Serial):
         super().reset_input_buffer()
         self.write("G93")
         response = super().read(16)
-        print(type(response))
+        print(response)
+        # print(type(response))
         #pos = response[2:-1].split(",")
         #print(pos)
     
@@ -158,7 +168,7 @@ class MiniMHbot(Robot):
 
     def write(self, gcode: str):
         super().write(gcode)
-        time.sleep(0.01)
+        sleep(0.01)
         
 class Maxi(Robot):
     def __init__(self, *args, **kwargs):
@@ -167,7 +177,7 @@ class Maxi(Robot):
         self.z_offset = -825
 
 
-class Sorting_bot(Maxi):
+class Sorting_bot(Robot):
     def __init__(self, port, *args, **kwargs):
         try :
             super().__init__(port, *args, **kwargs)
@@ -177,53 +187,50 @@ class Sorting_bot(Maxi):
         if not self:
             print("Not working")
         
-        self.Z_PICKUP = 0
-        self.Z_BEFORE_PUMP = 30
-        self.Z_FOR_MOVE = 150
-        self.Z_FOR_DROPOFF = 30
-        self.drop_locs = {"red": (150,0),
-                          "item1": (150,150),
-                          "item2": (150,-150),
-                          "item3": (-150,0),
-                          "item4": (-150,150),
-                          "item5": (-150,-150)}
-        
         self.queue = []
         self.item = False
         self.time_next = 0
-        self.picktime = 2
-        self.droptime = 2
         self.working = False
-      
 
-    def pickup(self,pos):
-        print(self.item)
-        self.time_next = time.time()+self.picktime
+    def pickup(self,pos,item_time):
+        # print(self.item)
+        self.time_next = time()+self.picktime
         self.working = True
         self.move(z=self.Z_FOR_MOVE)
-        self.move(x=pos)
+        Y_PICKUP = (time() - item_time) * self.belt_speed - self.Y
+        print(Y_PICKUP)
+        # print(self.belt_speed)
+        self.move(x=pos,y=Y_PICKUP)
         self.move(z=self.Z_BEFORE_PUMP)
         self.pump_on()
         self.move(z=self.Z_PICKUP)
         self.move(z=self.Z_FOR_MOVE)
     
     def dropoff(self,item):
-        print(self.item)
-        self.time_next = time.time()+self.droptime
+        # print(self.item)
+        self.time_next = time()+self.droptime
         self.working = False
         X_DROP, Y_DROP = self.drop_locs[item]
         self.move(x=X_DROP, y=Y_DROP)
         self.move(z=self.Z_FOR_DROPOFF)
-        self.move(x=0,y=0,z=self.Z_FOR_MOVE)
+        self.pump_off()
+        # self.move(x=0,y=0,z=self.Z_FOR_MOVE)
+        self.move(z=self.Z_FOR_MOVE)
      
     def read_queue(self):
         try:
-            self.item = self.queue.pop(0)
+            loc = (time() - self.queue[0][2]) * self.belt_speed - self.Y
+            if loc > self.Y_MIN:
+                self.item = self.queue.pop(0)
+            if loc > self.Y_MAX:
+                self.missed_item += 1
+                print("Missed an item")
+                raise
         except: 
             self.item = False
 
     def status(self):
-        if time.time() >= self.time_next:
+        if time() >= self.time_next:
             if self.working:
                 print("Dropping")
                 self.dropoff(self.item[0])
@@ -232,7 +239,7 @@ class Sorting_bot(Maxi):
                 self.read_queue()
                 if self.item:
                     print("Picking")
-                    self.pickup(self.item[1])
+                    self.pickup(self.item[1],self.item[2])
             return True
         else:
             return False
@@ -245,120 +252,66 @@ class Sorting_bot(Maxi):
             return True
         else:
             return False
- 
-        
-class Sorting_bot_mini(MiniMHbot):
+
+class Maxi_bot(Sorting_bot):
     def __init__(self, port, *args, **kwargs):
-        #try :
+        print("Init Maxi bot")
         super().__init__(port, *args, **kwargs)
-        #except:
-        #    print("Error")
-        
-        if not self:
-            print("Not working")
-        
+        self.z_offset = -825
+
+        self.Z_PICKUP = 50
+        self.Z_BEFORE_PUMP = 80
+        self.Z_FOR_MOVE = 150
+        self.Z_FOR_DROPOFF = 80
+        self.Y = 500
+        self.Y_MIN = -200
+        self.Y_MAX = 200
+        self.picktime = 1
+        self.droptime = 1
+        self.belt_speed = 50. #mm/s 
+        # self.drop_locs = {"Red": (200,0),
+        #                   "Green": (200,170),
+        #                   "Blue": (200,-170),
+        #                   "Yellow": (-200,0),
+        #                   "Purple": (-200,170),
+        #                   "Brown": (-200,-170)}
+        self.drop_locs = {"Red": (180,30),
+                          "Green": (180,30),
+                          "Blue": (-130,25),
+                          "Yellow": (-200,0),
+                          "Purple": (-200,170),
+                          "Brown": (-200,-170)}
+
+        self.missed_items = 0
+
+        def set_speed(self, speed: int):
+            super().set_speed(speed)
+            self.picktime = (2.*(2000-speed)+0.1*(speed-100))/(2000-100)
+            self.droptime = self.picktime
+            print(self.picktime)
+
+class Mini_bot(Sorting_bot):
+    def __init__(self, port, *args, **kwargs):
+        print("Init Mini bot")
+        super().__init__(port, *args, **kwargs)
+        self.z_offset = -383
+
         self.Z_PICKUP = 50
         self.Z_BEFORE_PUMP = 70
         self.Z_FOR_MOVE = 150
         self.Z_FOR_DROPOFF = 40
-        self.drop_locs = {"item0": (-100,0),
-                          "item1": (10,10),
-                          "item2": (10,-10),
-                          "item3": (-10,0),
-                          "item4": (-10,10),
-                          "item5": (-10,-10)}
+        self.Y_MIN = 50
+        self.Y_MAX = 100
+        self.picktime = 1
+        self.droptime = 1
+        self.belt_speed = 1. #m/s 
+        self.drop_locs = {"Ball": (-120,-120),
+                          "Disc": (-90,70),
+                          "Brick": (-85,0),
+                          "item3": (-150,0),
+                          "item4": (-150,150),
+                          "item5": (-150,-150)}
 
-        self.queue = []
-        self.item = 0
-        self.time_next = 0
-        self.picktime = 50
-        self.droptime = 50
-        self.working = False
-        
-    def pickup(self,pos):
-        self.time_next = time.time()+self.picktime
-        self.move(x=pos)
-        self.move(z=self.Z_BEFORE_PUMP)
-        #self.pump_on()
-        self.move(z=self.Z_PICKUP)
-        self.move(z=self.Z_FOR_MOVE)
-    
-    def dropoff(self,item):
-        self.time_next = time.time()+self.droptime
-        X_DROP, Y_DROP = self.drop_locs[item]
-        self.move(x=X_DROP, y=Y_DROP)
-        self.move(z=self.Z_FOR_DROPOFF)
-        #self.pump_off()
-        self.move(z=self.Z_FOR_MOVE)
-    
-    def read_queue(self):
-        try:
-            self.item = self.queue.pop(0)
-        except: 
-            self.item = False
-
-    def status(self):
-        if time.time() >= self.time_next:
-            if working:
-                self.dropoff(self.item[0])
-            else:
-                self.read_queue()
-                if self.item:
-                    self.pickup(self.item[1])
-            return True
-        else:
-            return False
-    
-    def get_response(self):
-        msg = self.read(8)
-        self.reset_input_buffer()
-        print(msg)
-        if msg:
-            return True
-        else:
-            return False
-    
-    """
-    def pickup(self,pos):
-        self.move(x=pos)
-        self.get_response()
-        self.move(z=self.Z_BEFORE_PUMP)
-        self.get_response()
-        #self.pump_on()
-        #self.get_response()
-        self.move(z=self.Z_PICKUP)
-        self.get_response()
-        self.move(z=self.Z_FOR_MOVE)
-        self.get_response()
-    
-    def dropoff(self,item):
-        X_DROP, Y_DROP = self.drop_locs[item]
-        self.move(x=X_DROP, y=Y_DROP)
-        self.get_response()
-        self.move(z=self.Z_FOR_DROPOFF)
-        #self.get_response()
-        #self.pump_off()
-        self.get_response()
-        self.move(z=self.Z_FOR_MOVE)
-        self.get_response()
-        
-    def get_response(self):
-        while True:
-            print("Reading")
-            msg = self.read(8)
-            self.reset_input_buffer()
-            print(msg)
-            if msg:
-                break
-        return True
-    """
-    
-    
-"""
-def initBot(args):
-    print("type: ", args[1])
-    print("COM port: ", args[2])
-
-if __name__ == "__main__":
-    initBot(sys.argv)
-"""
+    def write(self, gcode: str):
+        super().write(gcode)
+        sleep(0.01)
