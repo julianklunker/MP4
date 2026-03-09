@@ -25,49 +25,51 @@ class _Tracker():
         return (item,pos,time())
 
 if __name__ == "__main__":
+    working = True
 
     camera = Camera(camera_index=0)
-    # print(dir(camera))
-    camera.connect()
     tracker = Tracker()
-    try:
-        frame = camera.capture_frame()
-        if frame == None:
-            raise
-    except:
-        print("Could Not Connect, Using Mock")
-        camera = _Camera()
-        tracker =  _Tracker()
-    # com_port = ""
 
+    if not camera.connect():
+        respons = input("Want to use mock? (y/n): ")
+        if respons.lower().startswith("y"):
+            camera = _Camera()
+            tracker = _Tracker()
+        else:
+            working = False
+
+    
     robs = []
     if argv[1:]:
         if argv[1].lower() == "mini":
             robot = Mini_bot(False)
             items = items_mini
             sleep(10)
+        elif argv[1].lower().startswith("com"):
+            robot0 = Maxi_bot(argv[1],n_bot=0)
+            robot0.set_speed(500)
+            robs.append(robot0)
             
     else:
-        robot0 = Maxi_bot(False,n_bot=0)
-        robot0.set_speed(500)
-        robs.append(robot0)
+        try:
+            robot0 = Maxi_bot(False,n_bot=0)
+            robot0.set_speed(500)
+            robs.append(robot0)
+            for rob in robs:
+                rob.move(x=0,y=0,z=200)
+        except:
+            print("Failed to connect to robot")
+            working = False
         # robot1 = Maxi_bot(False,n_bot=1)
         # robot1.set_speed(500)
         # robs.append(robot1)
 
     new_item = time()
 
-    for rob in robs:
-        rob.move(x=0,y=0,z=100)
-
-    item_test = [("Red",0,time()),("Green",0,time()),("Blue",0,time())]
-    while True:
+    while working:
 
         frame = camera.capture_frame()
-
-        # object_information = tracker.object_information(frame)
-        if len(item_test) > 0:
-            object_information = item_test.pop()
+        object_information = tracker.object_information(frame)
         cv2.imshow("Camera Feed", frame)
 
         if frame is not None:
@@ -81,7 +83,7 @@ if __name__ == "__main__":
             break
 
         if len(robot0.queue) < 20 and time() > new_item:
-            new_item = time()+triangular(0.05, 1.0, 0.1)
+            new_item = time() + triangular(0.05, 1.0, 0.1)
             print(f"{object_information}")
             if object_information[0] in items[:6]:
                 robot0.queue.append(object_information)
@@ -98,3 +100,4 @@ if __name__ == "__main__":
 
         for rob in robs:
             rob.status()
+    print("\n*** End of Program ***\n")

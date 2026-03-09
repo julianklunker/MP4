@@ -144,11 +144,7 @@ class Robot(serial.Serial):
         #pos = response[2:-1].split(",")
         #print(pos)
     
-    def read_serial(self):
-        msg = self.read(16)
-        return msg
-        
-    def closeCon(self):
+    def close_con(self):
         super().close()
         if self.is_open:
             print("Could not disconnect")
@@ -179,13 +175,7 @@ class Maxi(Robot):
 
 class Sorting_bot(Robot):
     def __init__(self, port, *args, **kwargs):
-        try :
-            super().__init__(port, *args, **kwargs)
-        except:
-            print("Error")
-        
-        if not self:
-            print("Not working")
+        super().__init__(port, *args, **kwargs)
         
         self.queue = []
         self.item = False
