@@ -6,6 +6,7 @@ from sys import argv
 from Camera.Camera import Camera
 from Data_analysis.Tracker import Tracker
 from Robot.Combined_bot_test import Maxi_bot, Mini_bot
+import configparser
 
 
 items = ["Red","Green","Blue","Yellow","Purple","Brown","Rosso", "Verde", "Blau", "Giallo", "Viola","Marrone"]
